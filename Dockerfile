@@ -2,10 +2,9 @@ FROM node:18-slim
 
 WORKDIR /app/server
 
-COPY server/package*.json server/tsconfig.json ./
+COPY server/ ./
 RUN npm install
 
-COPY server/ ./
 RUN npm run build
 
 EXPOSE 3001
