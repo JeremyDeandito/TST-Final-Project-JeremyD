@@ -9,6 +9,8 @@ import './ImageEditor.css';
 const storage = getStorage(app);
 const auth = getAuth(app);
 
+const BACKEND_URL = 'https://tst-final-project-jeremyd-production.up.railway.app';
+
 const ImageEditor: React.FC = () => {
   const [inputImage, setInputImage] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
@@ -86,7 +88,7 @@ const ImageEditor: React.FC = () => {
       ]);
 
       // Make API call to your backend
-      const response = await fetch('YOUR_BACKEND_URL/process-images', {
+      const response = await fetch(`${BACKEND_URL}/edit-image`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

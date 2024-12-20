@@ -6,7 +6,13 @@ import cors from 'cors';
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://jeremydeandito.github.io',
+    'http://localhost:3000'
+  ],
+  credentials: true
+}));
 
 // Tambahkan route untuk root path
 app.get('/', (req, res) => {
