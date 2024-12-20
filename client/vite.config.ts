@@ -6,11 +6,12 @@ export default defineConfig({
   plugins: [react()],
   base: '/TST-Final-Project-JeremyD/',
   server: {
-    cors: true,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    proxy: {
+      '/edit-image': {
+        target: 'https://tst-final-project-jeremyd-production.up.railway.app',
+        changeOrigin: true,
+        secure: false,
+      }
     }
   }
 })

@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getStorage } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
 import { app } from '../firebase';
 import './ImageEditor.css';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 
-// Initialize Firebase services
-const storage = getStorage(app);
+// Initialize Firebase auth
 const auth = getAuth(app);
 
 const BACKEND_URL = 'https://tst-final-project-jeremyd-production.up.railway.app';
@@ -19,6 +18,7 @@ const ImageEditor: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [processedImage, setProcessedImage] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const handleInputImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -40,22 +40,6 @@ const ImageEditor: React.FC = () => {
     }
   };
 
-  const uploadImage = async (file: File, path: string): Promise<string> => {
-    try {
-      const metadata = {
-        contentType: file.type,
-      };
-      
-      const storageRef = ref(storage, path);
-      const snapshot = await uploadBytes(storageRef, file, metadata);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      return downloadURL;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      throw error;
-    }
-  };
-
   const handleEditImage = async () => {
     if (!inputImage || !referenceImage) {
       setError('Please select both images');
@@ -66,45 +50,36 @@ const ImageEditor: React.FC = () => {
       setLoading(true);
       setError('');
 
-      // Convert base64 to Blob
       const inputBlob = await fetch(inputImage).then(r => r.blob());
       const referenceBlob = await fetch(referenceImage).then(r => r.blob());
 
-      // Create File objects
-      const inputFile = new File([inputBlob], inputFileName, { type: 'image/jpeg' });
-      const referenceFile = new File([referenceBlob], referenceFileName, { type: 'image/jpeg' });
+      const formData = new FormData();
+      formData.append('inputImage', inputBlob, inputFileName);
+      formData.append('referenceImage', referenceBlob, referenceFileName);
 
-      const userId = auth.currentUser?.uid;
-      if (!userId) {
-        throw new Error('User not authenticated');
-      }
+      const token = await auth.currentUser?.getIdToken();
 
-      const timestamp = Date.now();
-      
-      // Upload images and get URLs
-      const [inputUrl, referenceUrl] = await Promise.all([
-        uploadImage(inputFile, `images/${userId}/input_${timestamp}.jpg`),
-        uploadImage(referenceFile, `images/${userId}/reference_${timestamp}.jpg`)
-      ]);
-
-      // Make API call to your backend
       const response = await fetch(`${BACKEND_URL}/edit-image`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await auth.currentUser?.getIdToken()}`
+          'Authorization': `Bearer ${token || ''}`
         },
-        body: JSON.stringify({
-          inputImageUrl: inputUrl,
-          referenceImageUrl: referenceUrl
-        })
+        mode: 'cors',
+        credentials: 'include',
+        body: formData
       });
 
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Failed to process images');
+        const errorText = await response.text();
+        console.error('Server response:', errorText);
+        throw new Error(`Server error: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
+      console.log('Server result:', result);
+
       if (result.processedImageUrl) {
         setProcessedImage(result.processedImageUrl);
       } else {
@@ -112,10 +87,32 @@ const ImageEditor: React.FC = () => {
       }
 
     } catch (error) {
-      console.error('Error:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      console.error('Detailed error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to connect to server');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveEditedImage = async (editedImageUrl: string) => {
+    try {
+      const userId = auth.currentUser?.uid;
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      // Save to Firestore
+      await addDoc(collection(db, 'editedImages'), {
+        userId,
+        editedImageUrl,
+        timestamp: serverTimestamp()
+      });
+
+      // Show success message
+      setSuccess(true);
+    } catch (error) {
+      console.error('Error saving image:', error);
+      setError('Failed to save image. Please try again.');
     }
   };
 
@@ -182,6 +179,13 @@ const ImageEditor: React.FC = () => {
             <div className="image-preview">
               <img src={processedImage} alt="Processed result" />
             </div>
+            <button 
+              className="save-image-btn"
+              onClick={() => handleSaveEditedImage(processedImage)}
+              disabled={!processedImage}
+            >
+              Save Image
+            </button>
           </div>
         )}
       </div>

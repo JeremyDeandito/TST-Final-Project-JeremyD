@@ -14,13 +14,13 @@ body {
 .App {
   width: 100%;
   min-height: 100vh;
-  padding-top: 72px; /* Height of navbar */
+  padding-top: 100px; /* Height of navbar */
 }
 
 /* Make sure routes take full width */
 .routes-container {
   width: 100%;
-  min-height: calc(100vh - 72px);
+  min-height: calc(100vh - 100px);
 }
 
 #root {
@@ -71,7 +71,7 @@ body {
 .signup-container,
 .profile-container,
 .editor-container {
-  min-height: calc(100vh - 72px); /* Subtract navbar height */
+  min-height: calc(100vh - 100px); /* Subtract navbar height */
   width: 100%;
   display: flex;
   justify-content: center;

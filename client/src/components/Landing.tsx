@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../components/Landing.css';
+import logo from '../assets/Logo.png';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
@@ -9,7 +10,7 @@ const Landing: React.FC = () => {
     <div className="landing-container">
       <div className="landing-card">
         <div className="logo">
-          <img src={'/assets/Logo.png'} alt="Chroma Logo" />
+          <img src={logo} alt="Chroma Logo" />
         </div>
         
         <h2>Seamlessly Align Your Colors</h2>
@@ -21,7 +22,7 @@ const Landing: React.FC = () => {
         
         <button 
           className="edit-now-btn"
-          onClick={() => navigate('/editor')}
+          onClick={() => navigate('/login')}
         >
           Edit Now
         </button>

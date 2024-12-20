@@ -6,59 +6,50 @@ import cors from 'cors';
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
-app.use(cors({
-  origin: [
-    'https://jeremydeandito.github.io',
-    'http://localhost:3000'
-  ],
-  credentials: true
-}));
-
-// Tambahkan route untuk root path
-app.get('/', (req, res) => {
-  res.send('Welcome to the Image Editor API');
+// Add CORS preflight options
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
 });
 
-app.post('/extract-metadata', upload.single('image'), async (req, res) => {
-  if (!req.file) {
-    res.status(400).send('No file uploaded.');
-    return;
-  }
+// Use cors middleware after custom headers
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-  try {
-    const image = sharp(req.file.buffer);
-    const metadata = await image.metadata();
+// Middleware to parse JSON and form data
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-    const stats = await image.stats();
-    const averageBrightness = (stats.channels[0].mean + stats.channels[1].mean + stats.channels[2].mean) / (3 * 255);
-
-    const result = {
-      filename: req.file.originalname,
-      format: metadata.format,
-      width: metadata.width,
-      height: metadata.height,
-      averageBrightness: averageBrightness
-    };
-
-    res.json(result);
-  } catch (error) {
-    console.error('Error processing image:', error);
-    res.status(500).send('Error processing image');
-  }
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.send('Server is running');
 });
 
 app.post('/edit-image', upload.fields([
-  { name: 'input', maxCount: 1 },
-  { name: 'reference', maxCount: 1 }
+  { name: 'inputImage', maxCount: 1 },
+  { name: 'referenceImage', maxCount: 1 }
 ]), async (req, res) => {
-  if (!req.files || !('input' in req.files) || !('reference' in req.files)) {
-    res.status(400).send('Both input and reference images are required.');
-    return;
-  }
-
   try {
-    const inputFile = req.files['input'][0];
-    const referenceFile = req.files['reference'][0];
+    console.log('Received request for image editing');
+    
+    if (!req.files || !('inputImage' in req.files) || !('referenceImage' in req.files)) {
+      console.error('Missing files in request');
+      return res.status(400).json({ error: 'Both input and reference images are required.' });
+    }
+
+    const inputFile = req.files['inputImage'][0];
+    const referenceFile = req.files['referenceImage'][0];
     const inputImage = sharp(inputFile.buffer);
     const referenceImage = sharp(referenceFile.buffer);
 
@@ -79,22 +70,32 @@ app.post('/edit-image', upload.fields([
     // Apply adjustments to input image
     const editedImage = await inputImage
       .modulate({
-        brightness: brightnessAdjustment / 128, // Normalize to Sharp's expected range
+        brightness: brightnessAdjustment / 128,
         saturation: saturationAdjustment
       })
-      .linear([redAdjustment, greenAdjustment, blueAdjustment], [0, 0, 0]) // Apply color balance adjustments
-      .resize(refMetadata.width, refMetadata.height) // Match size of reference image
+      .linear([redAdjustment, greenAdjustment, blueAdjustment], [0, 0, 0])
+      .resize(refMetadata.width, refMetadata.height)
       .toBuffer();
 
-    res.contentType(`image/${refMetadata.format}`);
-    res.send(editedImage);
+    // Convert the buffer to base64
+    const base64Image = editedImage.toString('base64');
+    const processedImageUrl = `data:image/${refMetadata.format};base64,${base64Image}`;
+
+    res.json({
+      processedImageUrl,
+      message: 'Image processed successfully'
+    });
+
   } catch (error) {
-    console.error('Error editing image:', error);
-    res.status(500).send('Error editing image');
+    console.error('Error processing image:', error);
+    res.status(500).json({ error: 'Failed to process image' });
   }
 });
 
-const port = process.env.PORT || 3001;
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+const PORT = process.env.PORT || 3000;
+const CORS_ORIGIN = 'http://localhost:5173';
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log('Allowed origins:', CORS_ORIGIN);
 });
