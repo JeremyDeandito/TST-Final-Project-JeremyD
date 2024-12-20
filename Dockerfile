@@ -1,13 +1,13 @@
-FROM node:18
+FROM node:18-slim
 
-WORKDIR /app
+WORKDIR /app/server
 
-COPY server/package*.json server/
-RUN cd server && npm install
+COPY server/package*.json server/tsconfig.json ./
+RUN npm install
 
-COPY server/ server/
-RUN cd server && npm run build
+COPY server/ ./
+RUN npm run build
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "cd server && npm start"] 
+CMD ["npm", "start"] 
