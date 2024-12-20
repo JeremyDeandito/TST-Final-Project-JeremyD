@@ -1,8 +1,9 @@
 FROM node:18-slim
 
-WORKDIR /app/server
+WORKDIR /app
 
-COPY server/ ./
+COPY server/ .
+
 RUN npm install
 
 EXPOSE 3001
