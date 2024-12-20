@@ -5,7 +5,7 @@ WORKDIR /app
 COPY server/package*.json server/
 RUN cd server && npm install
 
-COPY . .
+COPY server/ server/
 RUN cd server && npm run build
 
 EXPOSE 3001
