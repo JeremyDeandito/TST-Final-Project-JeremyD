@@ -4,8 +4,12 @@ WORKDIR /app
 
 COPY server/ .
 
-RUN npm install
+RUN npm install && \
+    chmod +x node_modules/.bin/ts-node && \
+    chown -R node:node .
+
+USER node
 
 EXPOSE 3001
 
-CMD ["npm", "start"] 
+CMD ["./node_modules/.bin/ts-node", "server.ts"] 
