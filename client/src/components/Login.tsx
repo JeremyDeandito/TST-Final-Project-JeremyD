@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import './Login.css';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -14,6 +16,7 @@ const Login: React.FC = () => {
       await signInWithEmailAndPassword(auth, email, password);
       navigate('/');
     } catch (error) {
+      setError('Failed to sign in');
       console.error('Error logging in:', error);
     }
   };
@@ -23,39 +26,62 @@ const Login: React.FC = () => {
       await signInWithPopup(auth, googleProvider);
       navigate('/');
     } catch (error) {
+      setError('Failed to sign in with Google');
       console.error('Error logging in with Google:', error);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto mt-8">
-      <h2 className="text-2xl font-bold mb-4">Login</h2>
-      <form onSubmit={handleLogin} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="block mb-1">Email</label>
-          <input
-            type="email"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full px-3 py-2 border rounded"
-          />
+    <div className="login-container">
+      <div className="login-card">
+        <h1>Login</h1>
+        
+        {error && <div className="error-message">{error}</div>}
+        
+        <form onSubmit={handleLogin}>
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <button type="submit" className="login-btn">
+            Login
+          </button>
+        </form>
+
+        <div className="divider">
+          <span>or</span>
         </div>
-        <div>
-          <label htmlFor="password" className="block mb-1">Password</label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full px-3 py-2 border rounded"
-          />
-        </div>
-        <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded">Login</button>
-      </form>
-      <button onClick={handleGoogleLogin} className="w-full mt-4 bg-red-500 text-white py-2 rounded">Login with Google</button>
+
+        <button 
+          type="button"
+          className="google-btn"
+          onClick={handleGoogleLogin}
+        >
+          Login with Google
+        </button>
+
+        <p className="signup-link">
+          Don't have an account? <Link to="/signup">Sign Up here</Link>
+        </p>
+      </div>
     </div>
   );
 };

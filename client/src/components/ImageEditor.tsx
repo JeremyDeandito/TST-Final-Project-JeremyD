@@ -1,109 +1,191 @@
-import React, { useState, useCallback } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { db } from '../firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import React, { useState } from 'react';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getStorage } from 'firebase/storage';
+import { getAuth } from 'firebase/auth';
+import { app } from '../firebase';
+import './ImageEditor.css';
 
-export default function ImageEditor() {
-  const [inputImage, setInputImage] = useState<File | null>(null);
-  const [referenceImage, setReferenceImage] = useState<File | null>(null);
-  const [editedImage, setEditedImage] = useState<string | null>(null);
-  const { currentUser } = useAuth();
+// Initialize Firebase services
+const storage = getStorage(app);
+const auth = getAuth(app);
 
-  const handleInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+const ImageEditor: React.FC = () => {
+  const [inputImage, setInputImage] = useState<string | null>(null);
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [inputFileName, setInputFileName] = useState<string>('');
+  const [referenceFileName, setReferenceFileName] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [processedImage, setProcessedImage] = useState<string | null>(null);
+
+  const handleInputImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setInputImage(file);
+      setInputFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (e) => setInputImage(e.target?.result as string);
+      reader.readAsDataURL(file);
     }
-  }, []);
+  };
 
-  const handleReferenceChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReferenceImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setReferenceImage(file);
+      setReferenceFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (e) => setReferenceImage(e.target?.result as string);
+      reader.readAsDataURL(file);
     }
-  }, []);
+  };
 
-  const handleEdit = async () => {
+  const uploadImage = async (file: File, path: string): Promise<string> => {
+    try {
+      const metadata = {
+        contentType: file.type,
+      };
+      
+      const storageRef = ref(storage, path);
+      const snapshot = await uploadBytes(storageRef, file, metadata);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
+  };
+
+  const handleEditImage = async () => {
     if (!inputImage || !referenceImage) {
-      alert('Please select both input and reference images.');
+      setError('Please select both images');
       return;
     }
 
-    const formData = new FormData();
-    formData.append('input', inputImage);
-    formData.append('reference', referenceImage);
-
     try {
-      const response = await fetch('http://localhost:3001/edit-image', {
+      setLoading(true);
+      setError('');
+
+      // Convert base64 to Blob
+      const inputBlob = await fetch(inputImage).then(r => r.blob());
+      const referenceBlob = await fetch(referenceImage).then(r => r.blob());
+
+      // Create File objects
+      const inputFile = new File([inputBlob], inputFileName, { type: 'image/jpeg' });
+      const referenceFile = new File([referenceBlob], referenceFileName, { type: 'image/jpeg' });
+
+      const userId = auth.currentUser?.uid;
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      const timestamp = Date.now();
+      
+      // Upload images and get URLs
+      const [inputUrl, referenceUrl] = await Promise.all([
+        uploadImage(inputFile, `images/${userId}/input_${timestamp}.jpg`),
+        uploadImage(referenceFile, `images/${userId}/reference_${timestamp}.jpg`)
+      ]);
+
+      // Make API call to your backend
+      const response = await fetch('YOUR_BACKEND_URL/process-images', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await auth.currentUser?.getIdToken()}`
+        },
+        body: JSON.stringify({
+          inputImageUrl: inputUrl,
+          referenceImageUrl: referenceUrl
+        })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to edit image');
+        throw new Error('Failed to process images');
       }
 
-      const blob = await response.blob();
-      const editedImageUrl = URL.createObjectURL(blob);
-      setEditedImage(editedImageUrl);
-
-      // Save edited image to Firestore
-      if (currentUser) {
-        await addDoc(collection(db, 'editedImages'), {
-          userId: currentUser.uid,
-          url: editedImageUrl,
-          createdAt: new Date()
-        });
+      const result = await response.json();
+      if (result.processedImageUrl) {
+        setProcessedImage(result.processedImageUrl);
+      } else {
+        throw new Error('No processed image URL received');
       }
+
     } catch (error) {
-      console.error('Error editing image:', error);
-      alert('Error editing image. Please try again.');
+      console.error('Error:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
-        <h1 className="text-2xl font-bold mb-4">Image Editor</h1>
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="input-image">
-            Input Image
-          </label>
-          <input
-            id="input-image"
-            type="file"
-            accept="image/*"
-            onChange={handleInputChange}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          />
+    <div className="editor-container">
+      <div className="editor-card">
+        <h1>Color Match</h1>
+        
+        {error && <div className="error-message">{error}</div>}
+        
+        <div className="image-upload-container">
+          <div className="upload-section">
+            <h2>Input Image</h2>
+            <div className="file-upload">
+              <label className="choose-file-btn">
+                Choose File
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleInputImageChange}
+                  hidden
+                />
+              </label>
+              <span className="filename">{inputFileName}</span>
+            </div>
+            <div className="image-preview">
+              {inputImage && <img src={inputImage} alt="Input preview" />}
+            </div>
+          </div>
+
+          <div className="divider" />
+
+          <div className="upload-section">
+            <h2>Reference Image</h2>
+            <div className="file-upload">
+              <label className="choose-file-btn">
+                Choose File
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleReferenceImageChange}
+                  hidden
+                />
+              </label>
+              <span className="filename">{referenceFileName}</span>
+            </div>
+            <div className="image-preview">
+              {referenceImage && <img src={referenceImage} alt="Reference preview" />}
+            </div>
+          </div>
         </div>
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="reference-image">
-            Reference Image
-          </label>
-          <input
-            id="reference-image"
-            type="file"
-            accept="image/*"
-            onChange={handleReferenceChange}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          />
-        </div>
-        <button
-          onClick={handleEdit}
-          disabled={!inputImage || !referenceImage}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+
+        <button 
+          className="edit-image-btn"
+          onClick={handleEditImage}
+          disabled={!inputImage || !referenceImage || loading}
         >
-          Edit Image
+          {loading ? 'Processing...' : 'Edit Image'}
         </button>
-        {editedImage && (
-          <div className="mt-4">
-            <h3 className="text-lg font-semibold mb-2">Edited Image:</h3>
-            <img src={editedImage} alt="Edited" className="max-w-full h-auto" />
+
+        {processedImage && (
+          <div className="processed-image-section">
+            <h2>Processed Image</h2>
+            <div className="image-preview">
+              <img src={processedImage} alt="Processed result" />
+            </div>
           </div>
         )}
       </div>
     </div>
   );
-}
+};
+
+export default ImageEditor;
 
