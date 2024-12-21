@@ -8,7 +8,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Add CORS preflight options
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', ['http://localhost:5173', 'https://jeremydeandito.github.io'].join(', '));
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -21,7 +21,10 @@ app.use((req, res, next) => {
 
 // Use cors middleware after custom headers
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: [
+    'http://localhost:5173',
+    'https://jeremydeandito.github.io' 
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
