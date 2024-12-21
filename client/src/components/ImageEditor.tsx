@@ -116,6 +116,15 @@ const ImageEditor: React.FC = () => {
     }
   };
 
+  const downloadImage = (imageUrl: string) => {
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = 'edited-image.jpg';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="editor-container">
       <div className="editor-card">
@@ -185,6 +194,13 @@ const ImageEditor: React.FC = () => {
               disabled={!processedImage}
             >
               Save Image
+            </button>
+            <button 
+              className="download-image-btn"
+              onClick={() => downloadImage(processedImage)}
+              disabled={!processedImage}
+            >
+              Download Image
             </button>
           </div>
         )}
